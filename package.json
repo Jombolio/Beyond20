@@ -15,7 +15,7 @@
         "package": "run-s build package:*",
         "package:chrome": "cross-var web-ext build --source-dir=./build/chrome/ --artifacts-dir=./build/artifacts/ --filename=beyond_20-$npm_package_version-chrome.zip",
         "package:firefox": "cross-var web-ext build --source-dir=./build/firefox/ --artifacts-dir=./build/artifacts/ --filename=beyond_20-$npm_package_version-firefox.zip",
-        "package:src": "cross-var git archive --format=zip -o ./build/artifacts/beyond_20-$npm_package_version-src.zip HEAD images/ libs/ src/ package.json options.html options.css manifest.json manifest_ff.json popup.html gulpfile.js default_popup.html README.md LICENSE LICENSE.MIT",
+        "package:src": "cross-var git archive --format=zip -o ./build/artifacts/beyond_20-$npm_package_version-src.zip HEAD images/ libs/ src/ FVTT-module/beyond20/beyond20.css package.json options.html options.css manifest.json manifest_ff.json popup.html gulpfile.js default_popup.html README.md LICENSE LICENSE.MIT",
         "start:chrome": "web-ext run -t chromium --source-dir ./build/chrome/",
         "start:firefox": "web-ext run --source-dir ./build/firefox/"
     },
