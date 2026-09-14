@@ -641,8 +641,23 @@ class Beyond20 {
         return true;
     }
 
+    /**
+     * Native rolls depend on dnd5e's d20Roll helper and the system's template.json data,
+     * which current dnd5e releases no longer provide and Foundry 14 removed.
+     */
+    static nativeRollsSupported() {
+        if (this._nativeRollsSupported === undefined) {
+            const dnd5e = game.dnd5e || globalThis.dnd5e;
+            this._nativeRollsSupported = game.system?.id === "dnd5e" &&
+                typeof dnd5e?.dice?.d20Roll === "function" &&
+                !!game.system.template?.Actor;
+        }
+        return this._nativeRollsSupported;
+    }
+
     static handleBeyond20Request(action, request) {
         if (action !== "roll") return;
+        if (!this.nativeRollsSupported()) return;
         let nativeRolls = false;
         try {
             nativeRolls = game.settings.get("beyond20", "nativeRolls");
@@ -704,7 +719,7 @@ class Beyond20 {
         //const isHealing = roll.hasClass("beyond20-healing");
         const container = $(`
         <span class="beyond20-chat-damage-buttons-container">
-          <i class="fas fa-long-arrow-alt-left"></i>
+          <i class="fa-solid fa-left-long"></i>
           <span class="beyond20-chat-damage-buttons"></span>
         </span>`)
         const buttonContainer = container.find(".beyond20-chat-damage-buttons");
@@ -732,7 +747,7 @@ class Beyond20 {
             },
             {
                 multiplier: -1,
-                icon: "first-aid",
+                icon: "kit-medical",
                 label: "Apply Healing",
                 color: "LightGreen",
                 visible: true
@@ -740,7 +755,7 @@ class Beyond20 {
         ];
         for (const data of buttons) {
             if (!data.visible) continue;
-            const button = $(`<button title="${data.label}" style="background-color: ${data.color};"><i class="fas fa-${data.icon}"></i></button>`);
+            const button = $(`<button title="${data.label}" style="background-color: ${data.color};"><i class="fa-solid fa-${data.icon}"></i></button>`);
             button.on('click', async () => {
                 for (const token of canvas.tokens.controlled) {
                     await token.actor?.applyDamage(damage, { multiplier: data.multiplier });
@@ -750,9 +765,67 @@ class Beyond20 {
         }
         roll.append(container);
     }
+
+    /**
+     * Remind the player to activate the Beyond20 extension, which doesn't load
+     * automatically on custom domains.
+     */
+    static showActivationReminder() {
+        const content = "<p>Beyond20 does not load automatically for FVTT games on custom domains.</p>" +
+            "<p>If you wish to use Beyond20, please activate it by clicking on the <img style='border: 0px; vertical-align: middle;' src='modules/beyond20/images/icons/icon20.png'/> icon in your browser's toolbar.</p>" +
+            "<div class='form-group'>" +
+            "<label for='dontaskagain'>Don't remind me again.</label>" +
+            "<input name='dontaskagain' type='checkbox' value='false' data-dtype='Boolean'></input>" +
+            "</div>";
+        const dismiss = (dontAskAgain) => game.settings.set("beyond20", "notifyAtLoad", !dontAskAgain);
+        let closed = false;
+        let dialog;
+        const DialogV2 = foundry.applications?.api?.DialogV2;
+        if (DialogV2) {
+            dialog = new DialogV2({
+                window: { title: "Beyond20" },
+                position: { width: 600 },
+                content,
+                buttons: [{
+                    action: "dismiss",
+                    label: "Dismiss",
+                    icon: "fa-solid fa-xmark",
+                    default: true,
+                    callback: (event, button) => dismiss(button.form.elements.dontaskagain.checked)
+                }]
+            });
+            dialog.addEventListener?.("close", () => closed = true, { once: true });
+            dialog.render({ force: true });
+        } else {
+            dialog = new Dialog({
+                title: "Beyond20",
+                content,
+                buttons: {
+                    dismiss: {
+                        icon: '<i class="fas fa-times"></i>',
+                        label: "Dismiss",
+                        callback: html => dismiss(html.find("input[name=dontaskagain]")[0].checked)
+                    }
+                },
+                default: "dismiss",
+                close: () => closed = true
+            }, { width: 600 });
+            dialog.render(true);
+        }
+        // Close the reminder once the extension gets activated in this tab
+        const closeWhenActivated = () => {
+            if (closed) return;
+            if (game.beyond20) return dialog.close();
+            setTimeout(closeWhenActivated, 500);
+        };
+        setTimeout(closeWhenActivated, 500);
+    }
 }
 
-class Beyond20CreateNativeActorsApplication extends FormApplication {
+// The settings menu only needs a render() entry point, so extend ApplicationV2 where it exists
+// instead of the deprecated FormApplication
+const Beyond20MenuApplication = foundry.applications?.api?.ApplicationV2 ?? FormApplication;
+class Beyond20CreateNativeActorsApplication extends Beyond20MenuApplication {
     async render() {
         if (!game.user.isGM) {
             return ui.notifications.error("Only the GM can create actors for Beyond20.");
@@ -794,11 +867,14 @@ class Beyond20CreateNativeActorsApplication extends FormApplication {
 }
 
 Hooks.on('beyond20Request', (action, request) => Beyond20.handleBeyond20Request(action, request))
-const chatHook = fvtt_isNewer(game.version || game.data.version, "13") ? "renderChatMessageHTML" : "renderChatMessage";
-Hooks.on(chatHook, (message, html, data) => Beyond20.handleChatMessage(message, html, data));
 
 Hooks.on('init', function () {
     const foundryVersion = game.version || game.data.version;
+    // Choose the chat hook once the game is initialized: reading the version while this
+    // script loads can throw before any of the hooks below are registered.
+    const chatHook = fvtt_isNewer(foundryVersion, "13") ? "renderChatMessageHTML" : "renderChatMessage";
+    Hooks.on(chatHook, (message, html, data) => Beyond20.handleChatMessage(message, html, data));
+
     game.settings.register("beyond20", "notifyAtLoad", {
         name: "Notify player to activate Beyond20",
         hint: "Beyond20 extension doesn't load automatically for Foundry unless permission is granted. The module can show a notification to remind the player to activate it for the current tab.",
@@ -818,11 +894,13 @@ Hooks.on('init', function () {
         default: true,
         type: Boolean
     });
+    // Only offer native rolls when this Foundry and dnd5e combination can run them
+    const nativeRollsSupported = Beyond20.nativeRollsSupported();
     game.settings.register("beyond20", "nativeRolls", {
         name: "Use Foundry native rolls (EXPERIMENTAL)",
         hint: "If enabled, will use Foundry native rolls instead of the Beyond20 roll renderer. Cannot work when D&D Beyond Digital Dice are enabled. All Beyond20 features may not be supported.",
         scope: "client",
-        config: true,
+        config: nativeRollsSupported,
         default: false,
         type: Boolean,
         onChange: async (v) => {
@@ -838,59 +916,39 @@ Hooks.on('init', function () {
             }
         }
     });
-    game.settings.registerMenu("beyond20", "createNativeActors", {
-        name: "Create native rolls Actors",
-        label: "Create Actors",      // The text label used in the button
-        hint: "Creates a Beyond20 native rolls actor for each user (if one doesn't exist), allowing them to use the native rolls feature.",
-        icon: "fas fa-users",
-        type: Beyond20CreateNativeActorsApplication,   // A FormApplication subclass which should be created
-        restricted: true
-    });
+    if (nativeRollsSupported) {
+        game.settings.registerMenu("beyond20", "createNativeActors", {
+            name: "Create native rolls Actors",
+            label: "Create Actors",      // The text label used in the button
+            hint: "Creates a Beyond20 native rolls actor for each user (if one doesn't exist), allowing them to use the native rolls feature.",
+            icon: "fa-solid fa-users",
+            type: Beyond20CreateNativeActorsApplication,   // An Application subclass which should be created
+            restricted: true
+        });
+    }
 });
 
 Hooks.on('ready', function () {
     const foundryVersion = game.version || game.data.version;
-    if (game.settings.get("beyond20", "nativeRolls")  && !Actor.canUserCreate(game.user)) {
+    let nativeRolls = game.settings.get("beyond20", "nativeRolls");
+    if (nativeRolls && !Beyond20.nativeRollsSupported()) {
+        ui.notifications.warn(`Disabled Beyond20 native rolls as they are not supported on Foundry VTT v${foundryVersion} with this version of the D&D 5e system.`, {permanent: true});
+        game.settings.set("beyond20", "nativeRolls", false);
+        nativeRolls = false;
+    }
+    if (nativeRolls && !Actor.canUserCreate(game.user)) {
         if (!Beyond20.getMyActor()) {
             ui.notifications.warn(`Cannot enable Beyond20 native rolls because native actor doesn't exist. Please ask your GM to create the actors from the Beyond20 module settings.`, {permanent: true});
             game.settings.set("beyond20", "nativeRolls", false);
+            nativeRolls = false;
         }
     }
     // Disable native rolls if Foundry is pre v10
-    if (game.settings.get("beyond20", "nativeRolls") && !fvtt_isNewer(foundryVersion, "10")) {
+    if (nativeRolls && !fvtt_isNewer(foundryVersion, "10")) {
         ui.notifications.warn(`Disabled Beyond20 native rolls feature as it is incompatible with Foundry VTT v${foundryVersion}. Please upgrade to version 10 or newer.`, {permanent: true});
         game.settings.set("beyond20", "nativeRolls", false);
     }
     if (game.settings.get("beyond20", "notifyAtLoad") && !game.beyond20) {
-        dialog = new Dialog({
-            title: `Beyond20`,
-            content: "<p>Beyond20 does not load automatically for FVTT games on custom domains.</p>" +
-                "<p>If you wish to use Beyond20, please activate it by clicking on the <img style='border: 0px; vertical-align: middle;' src='modules/beyond20/images/icons/icon20.png'/> icon in your browser's toolbar.</p>" +
-                "<div class='form-group'>" +
-                "<label for='dontaskagain'>Don't remind me again.</label>" +
-                "<input name='dontaskagain' type='checkbox' value='false' data-dtype='Boolean'></input>" +
-                "</div>",
-            buttons: {
-                dismiss: {
-                    icon: '<i class="fas fa-times"></i>',
-                    label: "Dismiss",
-                    callback: html => {
-                        game.settings.set("beyond20", "notifyAtLoad", !html.find("input[name=dontaskagain]")[0].checked);
-                        dialog = null;
-                    }
-                }
-            },
-            default: "dismiss"
-        }, { width: 600 }).render(true);
-
-        let cb = () => {
-            if (!dialog) return;
-            if (document.title.startsWith("Foundry Virtual Tabletop")) {
-                setTimeout(cb, 500);
-            } else  {
-                dialog.close();
-            }
-        }
-        setTimeout(cb, 500)
-    } 
+        Beyond20.showActivationReminder();
+    }
 })
