@@ -1,0 +1,90 @@
+# Test builds only: packs the Chrome extension from this branch and publishes a signed CRX with
+# an update manifest on the chrome-dev-updates branch, so an installed dev build updates itself.
+name: Chrome dev build
+
+on:
+  push:
+    branches:
+      - fvtt-v14-compat-test
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: chrome-dev-build
+  cancel-in-progress: true
+
+env:
+  UPDATES_BRANCH: chrome-dev-updates
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install build dependencies
+        run: npm install
+
+      - name: Build Beyond20 for Chrome
+        run: npm run build:chrome
+
+      - name: Mark the build as a dev version
+        id: version
+        env:
+          UPDATES_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ env.UPDATES_BRANCH }}
+        run: |
+          node -e '
+            const fs = require("fs");
+            const file = "build/chrome/manifest.json";
+            const manifest = JSON.parse(fs.readFileSync(file, "utf8"));
+            const base = manifest.version.split(".").slice(0, 3).join(".");
+            // Chrome only installs updates with a higher version, so the run number is the fourth part
+            manifest.version = `${base}.${process.env.GITHUB_RUN_NUMBER}`;
+            manifest.version_name = `${base} dev ${process.env.GITHUB_SHA.slice(0, 7)}`;
+            manifest.name = "Beyond 20 (dev)";
+            manifest.update_url = `${process.env.UPDATES_URL}/update.xml`;
+            fs.writeFileSync(file, JSON.stringify(manifest, null, 4));
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${manifest.version}\n`);
+          '
+
+      - name: Pack the signed CRX
+        env:
+          CHROME_EXTENSION_KEY: ${{ secrets.CHROME_EXTENSION_KEY }}
+          UPDATES_URL: https://raw.githubusercontent.com/${{ github.repository }}/${{ env.UPDATES_BRANCH }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if [ -z "$CHROME_EXTENSION_KEY" ]; then
+            echo "::error::Add the extension's private key to this repository as the CHROME_EXTENSION_KEY secret"
+            exit 1
+          fi
+          mkdir -p publish
+          printf '%s\n' "$CHROME_EXTENSION_KEY" > "$RUNNER_TEMP/key.pem"
+          # The file name carries the version so a cached older CRX is never served for a new update
+          npx --yes crx3@2 -p "$RUNNER_TEMP/key.pem" \
+            -o "publish/beyond20-dev-$VERSION.crx" \
+            -x publish/update.xml \
+            --appVersion "$VERSION" \
+            --crxURL "$UPDATES_URL/beyond20-dev-$VERSION.crx" \
+            build/chrome
+          rm "$RUNNER_TEMP/key.pem"
+          cat publish/update.xml
+
+      - name: Publish to the updates branch
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cd publish
+          git init -q -b "$UPDATES_BRANCH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -q -m "Chrome dev build $VERSION"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" "$UPDATES_BRANCH"
