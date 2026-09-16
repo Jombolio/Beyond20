@@ -17,6 +17,12 @@ const docIsOwner = (doc) => {
     return doc?.owner;
 };
 
+// Foundry 14 renamed roll modes to message modes
+const ROLL_MODE_TO_MESSAGE_MODE = { roll: "public", publicroll: "public", gmroll: "gm", blindroll: "blind", selfroll: "self" };
+const MESSAGE_MODE_TO_ROLL_MODE = { public: "publicroll", ic: "publicroll", gm: "gmroll", blind: "blindroll", self: "selfroll" };
+// D&D Beyond conditions, which share their ids with Foundry's dnd5e status effects
+const DNDB_CONDITIONS = ["blinded", "charmed", "deafened", "frightened", "grappled", "incapacitated", "invisible", "paralyzed", "petrified", "poisoned", "prone", "restrained", "stunned", "unconscious"];
+
 class FVTTDisplayer {
     postHTML(request, title, html, character, whisper, play_sound, source, attributes, description, attack_rolls, roll_info, damage_rolls, total_damages, open) {
         const hookName = fvtt_isNewer(fvttVersion, "13") ? 'renderChatMessageHTML' : 'renderChatMessage';
@@ -41,19 +47,23 @@ class FVTTDisplayer {
     _postChatMessage(message, character, whisper, play_sound = false, attack_rolls, damage_rolls) {
         const MESSAGE_STYLES = CONST.CHAT_MESSAGE_STYLES || CONST.CHAT_MESSAGE_TYPES || CHAT_MESSAGE_STYLES || CHAT_MESSAGE_TYPES;
         const styleProp = fvtt_isNewer(fvttVersion, "13") ? "style" : "type";
+        // Foundry 12 dropped the ROLL and WHISPER styles
+        const hasLegacyStyles = MESSAGE_STYLES.ROLL !== undefined;
         const data = {
             "content": message,
-            "user": game.user?.id || game.user?._id,
+            // ChatMessage#user was renamed to author in Foundry 12
+            [fvtt_isNewer(fvttVersion, "12") ? "author" : "user"]: game.user?.id || game.user?._id,
             "speaker": this._getSpeakerByName(character)
         }
         const rollMode = this._whisperToRollMode(whisper);
         if (["gmroll", "blindroll"].includes(rollMode)) {
             data["whisper"] = (ChatMessage.getWhisperRecipients || ChatMessage.getWhisperIDs).call(ChatMessage, "GM");
-            data[styleProp] = MESSAGE_STYLES.WHISPER;
+            data[styleProp] = hasLegacyStyles ? MESSAGE_STYLES.WHISPER : MESSAGE_STYLES.OTHER;
             if (rollMode == "blindroll")
                 data["blind"] = true;
         } else {
-            data[styleProp] = MESSAGE_STYLES.OOC;
+            // Without the ROLL style, OOC messages show the user instead of the character's name
+            data[styleProp] = hasLegacyStyles ? MESSAGE_STYLES.OOC : MESSAGE_STYLES.OTHER;
         }
         if (play_sound)
             data["sound"] = CONFIG.sounds.dice;
@@ -180,11 +190,11 @@ class FVTTDisplayer {
                 pool_roll._rolled = true;
                 data.roll = pool_roll;
             }
-            if (!fvtt_isNewer(fvttVersion, "13")) {
+            if (hasLegacyStyles) {
                 data[styleProp] = MESSAGE_STYLES.ROLL;
             }
         }
-        return ChatMessage.create(data, {rollMode});
+        return ChatMessage.create(data, this._rollModeOptions(rollMode));
     }
 
     _getSpeakerByName(name) {
@@ -203,11 +213,27 @@ class FVTTDisplayer {
                 [WhisperType.NO]: "roll",
                 [WhisperType.HIDE_NAMES]: "roll",
                 [WhisperType.YES]: "gmroll",
-                [WhisperType.QUERY]: game.settings.get("core", "rollMode")
+                [WhisperType.QUERY]: this._getDefaultRollMode()
             }[whisper];
         } catch (err) {
-            return game.settings.get("core", "rollMode");
+            return this._getDefaultRollMode();
         }
+    }
+
+    _getDefaultRollMode() {
+        // Foundry 14 replaced the core rollMode setting with messageMode
+        if (fvtt_isNewer(fvttVersion, "14")) {
+            const mode = game.settings.get("core", "messageMode");
+            return MESSAGE_MODE_TO_ROLL_MODE[mode] || mode;
+        }
+        return game.settings.get("core", "rollMode");
+    }
+
+    _rollModeOptions(rollMode) {
+        if (fvtt_isNewer(fvttVersion, "14")) {
+            return { messageMode: ROLL_MODE_TO_MESSAGE_MODE[rollMode] || rollMode };
+        }
+        return { rollMode };
     }
 
     displayError(message) {
@@ -349,6 +375,8 @@ class FVTTRoller {
 
 class FVTTPrompter {
     prompt(title, html, ok_label = "OK", cancel_label = "Cancel") {
+        const DialogV2 = window.foundry?.applications?.api?.DialogV2;
+        if (DialogV2) return this._promptV2(DialogV2, title, html, ok_label, cancel_label);
         return new Promise((resolve, reject) => {
             const icon = `<img style="border: 0px;" src="${extension_url}images/icons/icon20.png"></img>`;
             let ok_pressed = false;
@@ -367,6 +395,26 @@ class FVTTPrompter {
                 "close": (html) => resolve(ok_pressed ? html : null)
             }).render(true);
         });
+    }
+
+    async _promptV2(DialogV2, title, html, ok_label, cancel_label) {
+        // Resolve with the dialog's content wrapped in jQuery, as the ApplicationV1 Dialog did
+        const result = await DialogV2.wait({
+            "window": { "title": title },
+            "content": html,
+            "buttons": [
+                {
+                    "action": "ok",
+                    "label": ok_label,
+                    "icon": "fa-solid fa-dice-d20",
+                    "default": true,
+                    "callback": (event, button, dialog) => $(dialog.element)
+                },
+                { "action": "cancel", "label": cancel_label, "icon": "fa-solid fa-xmark" }
+            ],
+            "rejectClose": false
+        });
+        return result instanceof jQuery ? result : null;
     }
 }
 
@@ -409,7 +457,8 @@ async function addInitiativeToCombat(roll) {
                 ui.notifications.warn("Cannot add initiative to tracker: Encounter was not created for this scene");
             } else {
                 for (let token of canvas.tokens.controlled) {
-                    combatant = game.combat.getCombatantByToken(token.id);
+                    // Foundry 12 added getCombatantsByToken and Foundry 14 removed getCombatantByToken
+                    const combatant = game.combat.getCombatantsByToken ? game.combat.getCombatantsByToken(token.id)[0] : game.combat.getCombatantByToken(token.id);
                     if (fvtt_isNewer(fvttVersion, "9")) {
                         if (combatant) {
                             await game.combat.updateEmbeddedDocuments("Combatant", [{ "_id": docData(combatant)._id, "initiative": roll.total }]);
@@ -418,7 +467,7 @@ async function addInitiativeToCombat(roll) {
                         }
                     } else {
                         if (combatant) {
-                            idField = combatant._id ? "_id" : "id";
+                            const idField = combatant._id ? "_id" : "id";
                             await game.combat.updateCombatant({ [idField]: combatant[idField], "initiative": roll.total });
                         } else {
                             await game.combat.createCombatant({ "tokenId": token.id, "hidden": docData(token).hidden, "initiative": roll.total });
@@ -518,10 +567,15 @@ function updateConditions(request, name, conditions, exhaustion) {
     const styleProp = fvtt_isNewer(fvttVersion, "13") ? "style" : "type";
     ChatMessage.create({
         "content": message,
-        "user": game.user?.id || game.user?._id,
+        [fvtt_isNewer(fvttVersion, "12") ? "author" : "user"]: game.user?.id || game.user?._id,
         "speaker": roll_renderer._displayer._getSpeakerByName(name),
         [styleProp]: MESSAGE_STYLES.EMOTE
     });
+
+    // Foundry 12+ shows token conditions through the actor's status effects, which don't need the module
+    if (typeof CONFIG.Actor.documentClass.prototype.toggleStatusEffect === "function") {
+        return updateStatusEffects(name, conditions, exhaustion);
+    }
 
     // Check for the beyond20 module, if (it's there, we can use its status effects.;
     const module = game.modules.get("beyond20");
@@ -576,6 +630,51 @@ function updateConditions(request, name, conditions, exhaustion) {
         }
         if (updates.length > 0) {
             canvas.scene.updateEmbeddedDocuments("Token", updates);
+        }
+    }
+}
+
+async function updateStatusEffects(name, conditions, exhaustion) {
+    name = name.toLowerCase().trim();
+    // Owned tokens named after the character, plus the character's own actor
+    const targets = canvas.tokens.placeables
+        .filter((t) => t.actor && docIsOwner(t) && docData(t).name.toLowerCase().trim() === name)
+        .map((t) => t.actor);
+    const actors = game.actors?.contents || game.actors?.entities || game.actors; // v13 compatibility
+    const actor = actors.find((a) => docIsOwner(a) && a.name.toLowerCase().trim() === name);
+    if (actor) targets.push(actor);
+
+    const wanted = conditions.map((c) => c.toLowerCase().trim());
+    const level = parseInt(exhaustion) || 0;
+    const statusIds = new Set(CONFIG.statusEffects.map((effect) => effect.id));
+    const defeated = CONFIG.specialStatusEffects?.DEFEATED;
+    const updated = new Set();
+    for (const target of targets) {
+        // A linked token shares its actor, so only update each document once
+        if (updated.has(target.uuid)) continue;
+        updated.add(target.uuid);
+        // Track the conditions Beyond20 applied, so conditions set from within Foundry are never removed
+        const applied = target.getFlag("world", "beyond20Conditions") || [];
+        const nowApplied = [];
+        for (const condition of DNDB_CONDITIONS) {
+            if (!statusIds.has(condition)) continue;
+            const active = target.statuses.has(condition);
+            if (wanted.includes(condition)) {
+                if (!active) await target.toggleStatusEffect(condition, { active: true });
+                if (!active || applied.includes(condition)) nowApplied.push(condition);
+            } else if (active && applied.includes(condition)) {
+                await target.toggleStatusEffect(condition, { active: false });
+            }
+        }
+        const currentExhaustion = fvtt_getProperty(target.system, "attributes.exhaustion");
+        if (currentExhaustion !== undefined && currentExhaustion !== level) {
+            await target.update({ "system.attributes.exhaustion": level });
+        }
+        if (level >= 6 && defeated && statusIds.has(defeated) && !target.statuses.has(defeated)) {
+            await target.toggleStatusEffect(defeated, { active: true, overlay: true });
+        }
+        if (applied.join() !== nowApplied.join()) {
+            await target.setFlag("world", "beyond20Conditions", nowApplied);
         }
     }
 }

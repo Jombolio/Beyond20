@@ -239,11 +239,11 @@ span.dice-roll.beyond20-tooltip-content {
     display: block;
 }
 
-.dice-tooltip .part-header {
+.beyond20-message :where(.dice-tooltip) .part-header {
     font-size: initial;
 }
 
-.dice-roll .dice-formula {
+.beyond20-message :where(.dice-roll) .dice-formula {
     margin: 0.3em 0;
     font-weight: normal;
 }
@@ -302,6 +302,7 @@ span.dice-roll.beyond20-tooltip-content {
     margin-left: 5px;
     padding: 0px 3px;
     border-radius: 3px;
+    color: #1b1b1b;
 }
 
 .beyond20-chat-damage-buttons-container > i,
@@ -315,4 +316,45 @@ span.dice-roll.beyond20-tooltip-content {
 
 .beyond20-roll-result:hover .beyond20-chat-damage-buttons-container > i {
     display: inline;
+}
+
+/***************************************************************************/
+/* Foundry VTT dark theme (v13+). Scoped the same way as Foundry's own theme
+ * colours, so a light-themed window inside a dark interface stays light. */
+@scope (.theme-dark) to (.themed) {
+    .beyond20-message details summary,
+    .beyond20-title,
+    .beyond20-roll-detail-normal {
+        color: var(--color-text-primary, #e8e6e3);
+    }
+    .beyond20-roll-detail-crit {
+        color: #6ccf6c;
+    }
+    .beyond20-roll-detail-fail {
+        color: #ff7b72;
+    }
+    .beyond20-roll-detail-crit-fail {
+        color: #82aaff;
+    }
+    .beyond20-roll-detail-discarded {
+        color: #a3a3a3;
+    }
+    .beyond20-dice-roller-content {
+        background-color: rgba(255, 255, 255, 0.06);
+    }
+    .beyond20-dice-roller-content .beyond20-roll-formula {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+    .beyond20-tooltip .beyond20-tooltip-content {
+        background-image: none;
+        background-color: #2b2a30;
+        color: var(--color-text-primary, #e8e6e3);
+    }
+    span.dice-roll.beyond20-tooltip-content {
+        background-color: #2b2a30;
+    }
+    .beyond20-chat-damage-buttons {
+        background-color: #3b3a41;
+        border-color: #6f6c66;
+    }
 }

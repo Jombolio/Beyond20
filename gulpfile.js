@@ -153,7 +153,8 @@ const SRC_FILES = {
         "src/common/sandbox-footer.js"
 	]
 }
-const CSS_FILES = ['src/extension/beyond20.css']
+// The roll result styles are shared with the Foundry VTT companion module, which ships them on their own
+const CSS_FILES = ['FVTT-module/beyond20/beyond20.css', 'src/extension/beyond20.css']
 
 const targets = {};
 for (const target in SRC_FILES) {
