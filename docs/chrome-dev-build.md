@@ -1,11 +1,11 @@
-# Beyond20 development build for Chrome
+# Installing Beyond20 with the Foundry VTT 14 fixes
 
-This fork builds Beyond20 from the `fvtt-v14-compat-test` branch, which carries the Foundry VTT 14
-and dnd5e 6 fixes. That build is **not in the Chrome Web Store**, so Chrome installs it from this
-repository instead and keeps it up to date from there.
+This fork of Beyond20 has the fixes needed for Foundry VTT 14 and dnd5e 6. The Chrome Web Store
+release doesn't have them yet, so Chrome installs this build straight from this repository and keeps
+it up to date from there.
 
 It installs as a separate extension called **Beyond 20 (dev)**, with its own settings and site
-permissions. Your settings from the store version don't carry over.
+permissions. Settings from the store version don't carry over.
 
 ## Before you start
 
@@ -86,5 +86,6 @@ extension, signs it with a private key kept as a repository secret, and publishe
 its update manifest on the `chrome-dev-updates` branch. The signing key fixes the extension's ID as
 `aiaomoikbbkghoegboakkdoopcenphga`, which is how Chrome recognises later builds as updates.
 
-These are test builds of a fork. For everyday play, use the
-[Chrome Web Store release](https://chrome.google.com/webstore/detail/beyond-20/gnblbpbepfbfmoobegdogkglpbhcjofh).
+These builds are unofficial: they come from this fork rather than the Chrome Web Store, so Google
+doesn't review them. The store release is the upstream version and doesn't have the Foundry 14
+fixes, so if you go back to it, remove this build first or every roll fires twice.
