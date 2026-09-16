@@ -3,22 +3,18 @@ Beyond20: D&D Beyond & Roll20/Foundry VTT Integration
 
 [Beyond20](https://beyond20.here-for-more.info/) is a browser extension that integrates the Character Sheet from D&D Beyond into Roll20, Foundry VTT & Discord.
 
-> **This fork** has the fixes for Foundry VTT 14 and dnd5e 6, which the Chrome Web Store release
-> doesn't have yet. See the
-> [install guide](https://github.com/Jombolio/Beyond20/blob/fvtt-v14-compat-test/docs/chrome-dev-build.md)
-> for the Chrome build and the matching Foundry module.
+> **This fork** carries the fixes for Foundry VTT 14 and dnd5e 6. Install the builds from this
+> repository rather than from the Chrome Web Store or Firefox Add-ons, which carry the upstream
+> version without those fixes. For Chrome, [docs/chrome-dev-build.md](docs/chrome-dev-build.md) sets
+> up a build that updates itself.
 
 # Install and Use
 
 ## Install 
 
-### Chrome
-
-To install Beyond 20 on Chrome, simply head over to the [Chrome Web Store](https://chrome.google.com/webstore/detail/beyond-20/gnblbpbepfbfmoobegdogkglpbhcjofh) and click "Add to Chrome" to get it installed.
-
-### Firefox
-
-To install Beyond 20 on Firefox, simply head over to [Firefox Extensions](https://addons.mozilla.org/en-CA/firefox/addon/beyond-20/) and click "Add to Firefox" to get it installed.
+Install the build from this repository by following [Developer Mode Installation](#developer-mode-installation)
+below. On Chrome you can instead follow [docs/chrome-dev-build.md](docs/chrome-dev-build.md), which
+installs a build that updates itself whenever this repository changes.
 
 ## Use 
 
@@ -42,7 +38,7 @@ You can then build the files using the command `npm run build`
 All you need is to load the extension from the source :
 
 0. If you already have Beyond20 installed from the Chrome or Firefox stores, disable it.
-1. Download the extension for either [Chrome](https://github.com/kakaroto/Beyond20/releases/download/latest/chrome.zip) or [Firefox](https://github.com/kakaroto/Beyond20/releases/download/latest/firefox.zip)
+1. Download the extension for either [Chrome](https://github.com/Jombolio/Beyond20/releases/download/latest/chrome.zip) or [Firefox](https://github.com/Jombolio/Beyond20/releases/download/latest/firefox.zip)
 2. Extract the zip file in a directory of your choice
 
 ## Chrome

@@ -20,8 +20,8 @@
     "styles": ["./beyond20.css"],
     "packs": [],
     "url": "https://beyond20.here-for-more.info",
-    "manifest": "https://raw.githubusercontent.com/kakaroto/Beyond20/master/FVTT-module/beyond20/module.json",
-    "download": "https://raw.githubusercontent.com/kakaroto/Beyond20/fvtt-module-v1.6.0/FVTT-module/beyond20.zip",
+    "manifest": "https://raw.githubusercontent.com/Jombolio/Beyond20/master/FVTT-module/beyond20/module.json",
+    "download": "https://raw.githubusercontent.com/Jombolio/Beyond20/master/FVTT-module/beyond20.zip",
     "compatibility": {
         "minimum": "11",
         "verified": "14"
