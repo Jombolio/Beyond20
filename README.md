@@ -3,6 +3,11 @@ Beyond20: D&D Beyond & Roll20/Foundry VTT Integration
 
 [Beyond20](https://beyond20.here-for-more.info/) is a browser extension that integrates the Character Sheet from D&D Beyond into Roll20, Foundry VTT & Discord.
 
+> **This fork** has the fixes for Foundry VTT 14 and dnd5e 6, which the Chrome Web Store release
+> doesn't have yet. See the
+> [install guide](https://github.com/Jombolio/Beyond20/blob/fvtt-v14-compat-test/docs/chrome-dev-build.md)
+> for the Chrome build and the matching Foundry module.
+
 # Install and Use
 
 ## Install 
