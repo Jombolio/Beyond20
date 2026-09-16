@@ -51,7 +51,7 @@ jobs:
             // Chrome only installs updates with a higher version, so the run number is the fourth part
             manifest.version = `${base}.${process.env.GITHUB_RUN_NUMBER}`;
             manifest.version_name = `${base} dev ${process.env.GITHUB_SHA.slice(0, 7)}`;
-            manifest.name = "Beyond 20 (dev)";
+            manifest.name = "Beyond 20 (V14)";
             manifest.update_url = `${process.env.UPDATES_URL}/update.xml`;
             fs.writeFileSync(file, JSON.stringify(manifest, null, 4));
             fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${manifest.version}\n`);

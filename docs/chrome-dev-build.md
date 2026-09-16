@@ -4,7 +4,7 @@ This fork of Beyond20 has the fixes needed for Foundry VTT 14 and dnd5e 6. The C
 release doesn't have them yet, so Chrome installs this build straight from this repository and keeps
 it up to date from there.
 
-It installs as a separate extension called **Beyond 20 (dev)**, with its own settings and site
+It installs as a separate extension called **Beyond 20 (V14)**, with its own settings and site
 permissions. Settings from the store version don't carry over.
 
 ## Before you start
@@ -31,7 +31,7 @@ Chrome allows extensions hosted outside the store on Linux. Windows and macOS do
 
 2. Quit Chrome completely and start it again. Linux installs the extension without prompting.
 
-3. Open `chrome://extensions` and check that **Beyond 20 (dev)** is listed. Its version is the
+3. Open `chrome://extensions` and check that **Beyond 20 (V14)** is listed. Its version is the
    Beyond20 version with the build number added, such as `2.21.0.1`.
 
 4. Open your Foundry VTT tab and click the Beyond20 icon in the toolbar to activate it for that
