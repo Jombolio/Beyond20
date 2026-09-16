@@ -6,6 +6,8 @@ on:
   push:
     branches:
       - fvtt-v14-compat-test
+    paths-ignore:
+      - '**/*.md'
   workflow_dispatch:
 
 permissions:
