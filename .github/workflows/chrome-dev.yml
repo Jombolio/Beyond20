@@ -83,6 +83,12 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          # Carry the previous package forward: GitHub's CDN can serve a cached update manifest
+          # for a few minutes, and the package it names has to still exist
+          git clone -q --depth 1 --branch "$UPDATES_BRANCH" \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" previous || true
+          if [ -d previous ]; then cp previous/*.crx publish/ 2>/dev/null || true; fi
+          ls -1 publish/*.crx | sort -V | head -n -2 | xargs -r rm -f
           cd publish
           git init -q -b "$UPDATES_BRANCH"
           git config user.name "github-actions[bot]"
