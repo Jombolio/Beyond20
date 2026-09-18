@@ -1,6 +1,6 @@
 ## Beyond20 has just been installed or updated
 
-Congratulations! Beyond20 was just updated to the latest version : v2.21.0
+Congratulations! Beyond20 was just updated to the latest version : v2.22.0
 
 I hope you like the new features, and hopefully the killer feature you were waiting for was just added.
 
@@ -17,6 +17,25 @@ Thank you all for your support!
 
 # Release Notes
 
+v2.22.0 (September 18th 2026)
+===
+
+Hi everyone,
+
+This is the Foundry VTT 14 test build of Beyond20. It installs alongside the Chrome Web Store release rather than replacing it, and says so in the D&D Beyond interface so you can tell which one you're using. Please run only one of the two at a time.
+
+This release brings Beyond20 up to date with Foundry VTT 14 and the dnd5e 6 system. Condition syncing, initiative tracking, and whispered and blind rolls all work again, and public rolls show your character's name instead of your user name.
+
+The companion module has been updated to 1.7.0 to match. That fixes it failing to load at all on Foundry 14, adds dark theme colours to the roll cards, and stops it restyling Foundry's own chat cards. The experimental native rolls have been rebuilt for dnd5e 4 and later, and are still switched off by default.
+
+We've also fixed HP syncing writing D&D Beyond's temporary Max HP modifiers over your character's real maximum, so casting Aid no longer changes your Max HP for good.
+
+You can read the full [Changelog](/Changelog#v2220) to see all the changes included in this release.
+
+Thank you to [@0xguy07](https://github.com/0xguy07) for the HP syncing fix!
+
+Enjoy!
+=
 v2.21.0 (August 25th 2026)
 ===
 
@@ -65,7 +84,21 @@ Click [here](/release_notes) for the full release notes from previous versions.
 
 # Changelog
 
-v2.20.2 (August 25th 2026)
+v2.22.0 (September 18th 2026)
+===
+- **Feature**: *FVTT*: Add support for Foundry VTT 14 and the dnd5e 6 system
+- **Feature**: *FVTT*: Rebuild the experimental native rolls for dnd5e 4 and later, with items built as Activities (still off by default)
+- **Feature**: Mark this build as a test version in the D&D Beyond interface, so it can be told apart from the store release
+- **Bugfix**: *FVTT*: Sync conditions through the actor's status effects, which is what Foundry 14 needs, and keep conditions set from inside Foundry
+- **Bugfix**: *FVTT*: Fix adding initiative to the combat tracker on Foundry 14
+- **Bugfix**: *FVTT*: Fix whispered and blind rolls on Foundry 14, which renamed roll modes to message modes
+- **Bugfix**: *FVTT*: Show the character's name on public rolls instead of the user's (#1350)
+- **Bugfix**: *FVTT*: Write D&D Beyond's Max HP modifiers to Temp Max HP instead of overwriting Max HP (#1158) (by [@0xguy07](https://github.com/0xguy07))
+- **Bugfix**: *FVTT module v1.7.0*: Fix the module failing to load at all on Foundry 14
+- **Bugfix**: *FVTT module v1.7.0*: Add dark theme colours to the roll cards, and stop them restyling Foundry's own and dnd5e's chat cards (#1409)
+- **Bugfix**: *FVTT module v1.7.0*: Hide the native rolls setting when the D&D 5e system can't support it
+
+v2.21.0 (August 25th 2026)
 ===
 - **Feature**: *dndbeyond*: Add support for the 2024 Wizard: Bladesinger: Bladesong feature (by [@jugarrit](https://github.com/jugarrit))
 - **Feature**: *dndbeyond*: Add support for the Unarmed Fighting fighting style (by [@dmportella](https://github.com/dmportella))

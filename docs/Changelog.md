@@ -1,3 +1,17 @@
+v2.22.0 (September 18th 2026)
+===
+- **Feature**: *FVTT*: Add support for Foundry VTT 14 and the dnd5e 6 system
+- **Feature**: *FVTT*: Rebuild the experimental native rolls for dnd5e 4 and later, with items built as Activities (still off by default)
+- **Feature**: Mark this build as a test version in the D&D Beyond interface, so it can be told apart from the store release
+- **Bugfix**: *FVTT*: Sync conditions through the actor's status effects, which is what Foundry 14 needs, and keep conditions set from inside Foundry
+- **Bugfix**: *FVTT*: Fix adding initiative to the combat tracker on Foundry 14
+- **Bugfix**: *FVTT*: Fix whispered and blind rolls on Foundry 14, which renamed roll modes to message modes
+- **Bugfix**: *FVTT*: Show the character's name on public rolls instead of the user's (#1350)
+- **Bugfix**: *FVTT*: Write D&D Beyond's Max HP modifiers to Temp Max HP instead of overwriting Max HP (#1158) (by [@0xguy07](https://github.com/0xguy07))
+- **Bugfix**: *FVTT module v1.7.0*: Fix the module failing to load at all on Foundry 14
+- **Bugfix**: *FVTT module v1.7.0*: Add dark theme colours to the roll cards, and stop them restyling Foundry's own and dnd5e's chat cards (#1409)
+- **Bugfix**: *FVTT module v1.7.0*: Hide the native rolls setting when the D&D 5e system can't support it
+
 v2.21.0 (August 25th 2026)
 ===
 - **Feature**: *dndbeyond*: Add support for the 2024 Wizard: Bladesinger: Bladesong feature (by [@jugarrit](https://github.com/jugarrit))

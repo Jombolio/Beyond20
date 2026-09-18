@@ -32,7 +32,7 @@ Chrome allows extensions hosted outside the store on Linux. Windows and macOS do
 2. Quit Chrome completely and start it again. Linux installs the extension without prompting.
 
 3. Open `chrome://extensions` and check that **Beyond 20 (V14)** is listed. Its version is the
-   Beyond20 version with the build number added, such as `2.21.0.1`.
+   Beyond20 version with the build number added, such as `2.22.0.1`.
 
 4. Open your Foundry VTT tab and click the Beyond20 icon in the toolbar to activate it for that
    site, the same as with the store version.

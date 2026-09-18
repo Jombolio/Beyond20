@@ -1,3 +1,23 @@
+v2.22.0 (September 18th 2026)
+===
+
+Hi everyone,
+
+This is the Foundry VTT 14 test build of Beyond20. It installs alongside the Chrome Web Store release rather than replacing it, and says so in the D&D Beyond interface so you can tell which one you're using. Please run only one of the two at a time.
+
+This release brings Beyond20 up to date with Foundry VTT 14 and the dnd5e 6 system. Condition syncing, initiative tracking, and whispered and blind rolls all work again, and public rolls show your character's name instead of your user name.
+
+The companion module has been updated to 1.7.0 to match. That fixes it failing to load at all on Foundry 14, adds dark theme colours to the roll cards, and stops it restyling Foundry's own chat cards. The experimental native rolls have been rebuilt for dnd5e 4 and later, and are still switched off by default.
+
+We've also fixed HP syncing writing D&D Beyond's temporary Max HP modifiers over your character's real maximum, so casting Aid no longer changes your Max HP for good.
+
+You can read the full [Changelog](/Changelog#v2220) to see all the changes included in this release.
+
+Thank you to [@0xguy07](https://github.com/0xguy07) for the HP syncing fix!
+
+Enjoy!
+
+
 v2.21.0 (August 25th 2026)
 ===
 

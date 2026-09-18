@@ -1,6 +1,6 @@
 {
 	"name": "Beyond 20 (V14)",
-	"version": "2.21.0",
+	"version": "2.22.0",
 	"manifest_version": 3,
 	"description": "TEST BUILD with the Foundry VTT 14 and dnd5e 6 fixes. Installs alongside the Chrome Web Store release of Beyond20 - run only one at a time. Integrates the D&D Beyond Character Sheets with Roll20 and Foundry VTT.",
 	"permissions": [
