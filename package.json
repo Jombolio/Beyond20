@@ -12,6 +12,8 @@
         "build": "run-s clean build:*",
         "build:firefox": "gulp build-firefox",
         "build:chrome": "gulp build-chrome",
+        "build:fvtt-zip": "node tools/build-fvtt-zip.js",
+        "check:fvtt-zip": "node tools/build-fvtt-zip.js --check",
         "package": "run-s build package:*",
         "package:chrome": "cross-var web-ext build --source-dir=./build/chrome/ --artifacts-dir=./build/artifacts/ --filename=beyond_20-$npm_package_version-chrome.zip",
         "package:firefox": "cross-var web-ext build --source-dir=./build/firefox/ --artifacts-dir=./build/artifacts/ --filename=beyond_20-$npm_package_version-firefox.zip",

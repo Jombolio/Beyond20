@@ -698,31 +698,31 @@ class Beyond20 {
             showButtons = false;
         }
         if (!showButtons) return;
-        if (!(html instanceof jQuery)) html = $(html);
-        const damages = html.find(".beyond20-message .beyond20-roll-damage, .beyond20-message .beyond20-total-damage");
-        if (damages.length === 0) return;
-        for (let i = 0; i < damages.length; i++) {
-            this._addChatDamageButtons(damages.eq(i));
+        // renderChatMessageHTML hands over an element, the older renderChatMessage a jQuery object
+        const element = html instanceof HTMLElement ? html : html?.[0];
+        if (!element) return;
+        const damages = element.querySelectorAll(".beyond20-message .beyond20-roll-damage, .beyond20-message .beyond20-total-damage");
+        for (const damage of damages) {
+            this._addChatDamageButtons(damage);
         }
     }
     static _addChatDamageButtons(roll) {
-        let valueSpan = roll.find(".beyond20-roll-value");
-        if (valueSpan.length === 0) {
-            // Fall back for old chat message
-            valueSpan = roll.find(".beyond20-tooltip > span:first-child");
-            if (valueSpan.length === 0) return;
-        }
-        const damage = parseInt(valueSpan.text());
+        // The second selector falls back to the old chat message layout
+        const valueSpan = roll.querySelector(".beyond20-roll-value") ||
+            roll.querySelector(".beyond20-tooltip > span:first-child");
+        if (!valueSpan) return;
+        const damage = parseInt(valueSpan.textContent);
         if (isNaN(damage)) return;
-        //const isTotal = roll.hasClass("beyond20-total-damage");
-        //const isCritical = roll.hasClass("beyond20-critical-damage");
-        //const isHealing = roll.hasClass("beyond20-healing");
-        const container = $(`
-        <span class="beyond20-chat-damage-buttons-container">
-          <i class="fa-solid fa-left-long"></i>
-          <span class="beyond20-chat-damage-buttons"></span>
-        </span>`)
-        const buttonContainer = container.find(".beyond20-chat-damage-buttons");
+        //const isTotal = roll.classList.contains("beyond20-total-damage");
+        //const isCritical = roll.classList.contains("beyond20-critical-damage");
+        //const isHealing = roll.classList.contains("beyond20-healing");
+        const container = document.createElement("span");
+        container.className = "beyond20-chat-damage-buttons-container";
+        const arrow = document.createElement("i");
+        arrow.className = "fa-solid fa-left-long";
+        const buttonContainer = document.createElement("span");
+        buttonContainer.className = "beyond20-chat-damage-buttons";
+        container.append(arrow, buttonContainer);
         const buttons = [
             {
                 multiplier: 1,
@@ -755,12 +755,18 @@ class Beyond20 {
         ];
         for (const data of buttons) {
             if (!data.visible) continue;
-            const button = $(`<button title="${data.label}" style="background-color: ${data.color};"><i class="fa-solid fa-${data.icon}"></i></button>`);
-            button.on('click', async () => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.title = data.label;
+            button.style.backgroundColor = data.color;
+            const icon = document.createElement("i");
+            icon.className = `fa-solid fa-${data.icon}`;
+            button.append(icon);
+            button.addEventListener('click', async () => {
                 for (const token of canvas.tokens.controlled) {
                     await token.actor?.applyDamage(damage, { multiplier: data.multiplier });
-                };
-            })
+                }
+            });
             buttonContainer.append(button);
         }
         roll.append(container);
