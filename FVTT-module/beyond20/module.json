@@ -2,7 +2,7 @@
     "id": "beyond20",
     "title": "Beyond20 companion module",
     "description": "This module allows the Beyond20 rolls to display properly in the main FVTT window and for other players who do not have Beyond20 installed",
-    "version": "1.6.0",
+    "version": "1.7.0",
     "authors": [{
         "name": "KaKaRoTo"
     }],

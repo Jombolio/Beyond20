@@ -3,6 +3,11 @@
 const fvtt_isNewer = foundry && foundry.utils && foundry.utils.isNewerVersion ? foundry.utils.isNewerVersion : isNewerVersion;
 const fvtt_Die = foundry && foundry.dice && foundry.dice.terms && foundry.dice.terms.Die ? foundry.dice.terms.Die : Die;
 const fvtt_PoolTerm = foundry && foundry.dice && foundry.dice.terms && foundry.dice.terms.PoolTerm ? foundry.dice.terms.PoolTerm : PoolTerm;
+// Foundry 14 removed the bare globals for these helpers. The right-hand side is only reached on
+// versions that still have them, so naming them here doesn't throw on 14.
+const fvtt_duplicate = foundry && foundry.utils && foundry.utils.duplicate ? foundry.utils.duplicate : duplicate;
+const fvtt_mergeObject = foundry && foundry.utils && foundry.utils.mergeObject ? foundry.utils.mergeObject : mergeObject;
+const fvtt_randomID = foundry && foundry.utils && foundry.utils.randomID ? foundry.utils.randomID : randomID;
 
 class Beyond20 {
     static getMyActor() {
@@ -20,12 +25,14 @@ class Beyond20 {
         }
     }
 
+    /**
+     * Default system data for a document type. dnd5e stopped shipping template.json and Foundry 14
+     * removed game.system.template, so this asks the data model for its own defaults instead.
+     */
     static _getDefaultTemplate(entityType, templateType) {
-        const data = duplicate(game.system.template[entityType][templateType]);
-        const templates = game.system.template[entityType][templateType].templates || [];
-        templates.forEach(template => mergeObject(data, game.system.template[entityType].templates[template])) 
-        delete data.templates;
-        return data;
+        const cls = entityType === "Actor" ? Actor : Item;
+        const documentClass = cls.implementation || cls;
+        return new documentClass({ name: "Beyond20", type: templateType }).toObject().system;
     }
 
     static async createActorData(request, initialItems=[]) {
@@ -77,61 +84,46 @@ class Beyond20 {
             actorData.attributes.prof = parseInt(request.character.proficiency)
         }
 
-        // Override spell slots so there's always one of each level 
+        // Override spell slots so there's always one of each level. The activities built for these
+        // items don't spend a slot either, so this is only here to keep a cast from being refused.
         for (let i = 1; i <= 9; i++) {
+            if (!actorData.spells?.[`spell${i}`]) continue;
             actorData.spells[`spell${i}`].override = 1;
             actorData.spells[`spell${i}`].value = 1;
             actorData.spells[`spell${i}`].max = 1;
         }
-        // Create a spell level of `true` because of https://gitlab.com/foundrynet/dnd5e/-/issues/1025
-        actorData.spells[true] = {value: 1, max: 1, override: 1};
 
-        // Cache SRD compendiums
-        if (!this._srdClasses) {
-            // Cache SRD Classes
-            const compendium = game.packs.get("dnd5e.classes")
-            this._srdClasses = compendium ? await compendium.getIndex() : [];
-            // Cache SRD items compendium
-            const itemsCompendium = game.packs.get("dnd5e.items")
-            this._srdItems = itemsCompendium ? await itemsCompendium.getIndex() : [];
-            // Cache SRD class features and racial features compendium
-            const classFeaturesCompendium = game.packs.get("dnd5e.classfeatures")
-            this._srdClassFeatures = classFeaturesCompendium ? await classFeaturesCompendium.getIndex() : [];
-            const racialFeaturesCompendium = game.packs.get("dnd5e.races")
-            this._srdRacialFeatures = racialFeaturesCompendium ? await racialFeaturesCompendium.getIndex() : [];
-            // Cache SRD monster features compendium
-            const monsterFeaturesCompendium = game.packs.get("dnd5e.monsterfeatures")
-            this._srdMonsterFeatures = monsterFeaturesCompendium ? await monsterFeaturesCompendium.getIndex() : [];
-        }
         let items = [];
+        const avatar = request.character.avatar;
         if (type === "character") {
             for (const [cls, level] of Object.entries(request.character.classes || {})) {
-                const item = await this.getItemDataFromSRD("dnd5e.classes", this._srdClasses, "class", cls, { templateFallback: true, defaultImg: request.character.avatar });
+                const item = await this.getItemDataFromSRD("classes", "class", cls, { templateFallback: true, defaultImg: avatar });
                 item.name = cls;
                 item.system.levels = parseInt(level);
                 items.push(item);
             }
             for (const feat of request.character['class-features'] || []) {
-                const item = await this.getItemDataFromSRD("dnd5e.classfeatures", this._srdClassFeatures, "feat", feat, { templateFallback: true, defaultImg: request.character.avatar });
+                const item = await this.getItemDataFromSRD("classFeatures", "feat", feat, { templateFallback: true, defaultImg: avatar });
                 item.name = feat;
                 items.push(item);
             }
             for (const trait of request.character['racial-features'] || []) {
-                const item = await this.getItemDataFromSRD("dnd5e.races", this._srdClassFeatures, "feat", trait, { templateFallback: true, defaultImg: request.character.avatar });
+                // Racial traits were looked up in the class feature index, so they never resolved
+                const item = await this.getItemDataFromSRD("racialFeatures", "feat", trait, { templateFallback: true, defaultImg: avatar });
                 item.name = trait;
                 items.push(item);
             }
             for (const feat of request.character['feats'] || []) {
-                const item = await this.getItemDataFromSRD("dnd5e.classfeatures", this._srdClassFeatures, "feat", feat, { templateFallback: true, defaultImg: request.character.avatar });
+                const item = await this.getItemDataFromSRD("feats", "feat", feat, { templateFallback: true, defaultImg: avatar });
                 item.name = feat;
                 items.push(item);
             }
         } else {
             // NPC
             for (const action of request.character.actions || []) {
-                let item = await this.getItemDataFromSRD("dnd5e.monsterfeatures", this._srdMonsterFeatures, "feat", action);
+                let item = await this.getItemDataFromSRD("monsterFeatures", "feat", action);
                 if (!item) {
-                    item = await this.getItemDataFromSRD("dnd5e.items", this._srdItems, "weapon", action, { templateFallback: true, defaultImg: request.character.avatar });
+                    item = await this.getItemDataFromSRD("items", "weapon", action, { templateFallback: true, defaultImg: avatar });
                 }
                 item.name = action;
                 items.push(item);
@@ -147,25 +139,45 @@ class Beyond20 {
     }
 
     /**
+     * The compendiums to search for each kind of item, most current rules first. dnd5e ships the
+     * 2024 content in its own packs and keeps the older SRD ones alongside, so a name is looked up
+     * in the 2024 pack before falling back to the legacy one. There is no classfeatures24: the 2024
+     * class features live in the classes24 pack.
+     */
+    static SRD_PACKS = {
+        classes: ["dnd5e.classes24", "dnd5e.classes"],
+        classFeatures: ["dnd5e.classes24", "dnd5e.classfeatures"],
+        racialFeatures: ["dnd5e.origins24", "dnd5e.races"],
+        feats: ["dnd5e.feats24", "dnd5e.classfeatures"],
+        items: ["dnd5e.equipment24", "dnd5e.items"],
+        monsterFeatures: ["dnd5e.monsterfeatures24", "dnd5e.monsterfeatures"]
+    };
+
+    /**
      * Get an Item from an SRD compendium and return a copy.
      * Optionally create a blank item from template
-     * 
-     * @param {String} compendiumName       Name of the compendium to get the document from
-     * @param {Collection} index            An index of the compendium to look in
+     *
+     * @param {String} packGroup            Key into SRD_PACKS naming which compendiums to search
      * @param {String} type                 The type of Item
      * @param {String} name                 The name of the object
-     * 
-     * @returns 
+     *
+     * @returns
      */
-    static async getItemDataFromSRD(compendiumName, index, type, name, {templateFallback=false, defaultImg=undefined}={}) {
-        const itemIdx = index.find(c => c.name.toLowerCase() == name.toLowerCase());
+    static async getItemDataFromSRD(packGroup, type, name, {templateFallback=false, defaultImg=undefined}={}) {
+        this._srdIndexes ??= {};
+        const wanted = name.toLowerCase();
         let item = null;
-        if (itemIdx) {
-            const compendium = game.packs.get(compendiumName)
-            const document = compendium && await compendium.getDocument(itemIdx._id);
+        for (const compendiumName of this.SRD_PACKS[packGroup] || []) {
+            const compendium = game.packs.get(compendiumName);
+            if (!compendium) continue;
+            this._srdIndexes[compendiumName] ??= await compendium.getIndex();
+            const itemIdx = this._srdIndexes[compendiumName].find(c => c.name.toLowerCase() === wanted);
+            if (!itemIdx) continue;
+            const document = await compendium.getDocument(itemIdx._id);
             if (document) {
-                item = duplicate(document._source);
+                item = fvtt_duplicate(document._source);
                 delete item._id;
+                break;
             }
         }
         if (!item && templateFallback) {
@@ -190,26 +202,27 @@ class Beyond20 {
         }
         return token || canvas.tokens.controlled[0];
     }
-    static async callOnToken(actor, token, callback) {
-        if (!token) return callback();
+    /**
+     * The speaker to put on a native roll's chat message, so it reads as coming from the character's
+     * token. This used to be done by swapping token.document._actor, actorLink and actorId around
+     * the roll, which are internals that can change in any release.
+     */
+    static _getSpeaker(actor, token) {
+        return ChatMessage.getSpeaker(token ? { actor, token: token.document ?? token } : { actor });
+    }
 
-        const originalActorId = token.document.actorId;
-        const originalLink = token.document.actorLink;
-        const originalActor = token.document._actor;
-        try {
-            token.document._actor = actor;
-            token.document.actorLink = true;
-            token.document.actorId = actor.id;
-            await callback();
-        } finally {
-            token.document._actor = originalActor;
-            token.document.actorLink = originalLink;
-            token.document.actorId = originalActorId;
-        }
+    /**
+     * Roll mode names changed in Foundry 14: the rollMode setting with roll/gmroll/blindroll/selfroll
+     * became messageMode with public/gm/blind/self. dnd5e hands whichever name it is given straight
+     * to ChatMessage, so it has to match the generation rather than being hard-coded.
+     */
+    static _getRollMode(request) {
+        const whispered = request.whisper !== 0;
+        if ((game.release?.generation ?? 0) >= 14) return whispered ? "gm" : "public";
+        return whispered ? "gmroll" : "roll";
     }
 
     static createItemData(request) {
-        let itemData = null;
         let type = "feat";
         switch (request.type) {
             default:
@@ -217,36 +230,33 @@ class Beyond20 {
             case 'action':
             case 'feature':
                 type = 'feat';
-                itemData = this._getDefaultTemplate('Item', type);
-                if (request.source) {
-                    itemData.requirements = `${request.source}: ${request['source-type']}`;
-                }
                 break;
             case 'item':
                 type = 'equipment';
-                itemData = this._getDefaultTemplate('Item', type);
-                itemData.rarity = request['item-type'];
                 break;
-            case 'spell-card': 
-                type = 'spell';
-                itemData = this._getDefaultTemplate('Item', type);
-                this._fillSpellData(request, itemData);
-                break;
+            case 'spell-card':
             case 'spell-attack':
                 type = 'spell';
-                itemData = this._getDefaultTemplate('Item', type);
-                this._fillSpellData(request, itemData);
                 break;
             case 'attack':
                 type = 'weapon';
-                itemData = this._getDefaultTemplate('Item', type);
-                this._buildAttackData(request, type, itemData);
                 break;
         }
-        if (!itemData) {
-            itemData = this._getDefaultTemplate('Item', type);
+        const itemData = this._getDefaultTemplate('Item', type);
+        if (type === 'feat' && request.source) {
+            itemData.requirements = `${request.source}: ${request['source-type']}`;
         }
-        itemData.source = "Beyond20";
+        if (type === 'equipment') {
+            itemData.rarity = request['item-type'];
+        }
+        if (type === 'spell') {
+            this._fillSpellData(request, itemData);
+        }
+        this._fillItemProperties(request, type, itemData);
+        // Since dnd5e 3, everything a use actually rolls lives in an activity on the item
+        itemData.activities = this._buildActivities(request, type);
+        // source became a SourceField object rather than a plain string
+        itemData.source = { custom: "Beyond20" };
         itemData.description.value = request.description.replace(/\n/g, "</br>");
         return {
             system: itemData,
@@ -267,16 +277,18 @@ class Beyond20 {
         itemData.activation.cost = cost;
         itemData.activation.type = activation === "bonus action" ? "bonus" : activation;
         
+        // The component booleans became entries in the item's properties set
+        const properties = new Set();
         let components = request.components;
         while (components != "") {
             if (components[0] == "V") {
-                itemData.components.vocal = true;
+                properties.add("vocal");
                 components = components.slice(1);
             } else if (components[0] == "S") {
-                itemData.components.somatic = true;
+                properties.add("somatic");
                 components = components.slice(1);
             } else if (components[0] == "M") {
-                itemData.components.material = true;
+                properties.add("material");
                 itemData.materials.value = components.slice(2, -1);
                 components = "";
             }
@@ -284,11 +296,17 @@ class Beyond20 {
                 components = components.slice(2);
             }
         }
-        itemData.components.concentration = request.concentration;
-        itemData.components.ritual = request.ritual;
-        
-        for (const [school, name] of Object.entries(CONFIG.DND5E.spellSchools)) {
-            if (request['level-school'].includes(name)) {
+        if (request.concentration) properties.add("concentration");
+        if (request.ritual) properties.add("ritual");
+        itemData.properties = [...properties];
+
+        // spellSchools entries are objects now, so matching against them as strings never hit. Match
+        // the localised label, then the English fullKey for a game running in another language.
+        const levelSchool = (request['level-school'] || "").toLowerCase();
+        for (const [school, config] of Object.entries(CONFIG.DND5E.spellSchools)) {
+            const label = (game.i18n.localize(config.label ?? config) || "").toLowerCase();
+            const fullKey = (config.fullKey || "").toLowerCase();
+            if ((label && levelSchool.includes(label)) || (fullKey && levelSchool.includes(fullKey))) {
                 itemData.school = school;
                 break;
             }
@@ -323,99 +341,163 @@ class Beyond20 {
             itemData.target.type = request['aoe-shape'].toLowerCase();
         }
 
-        this._buildAttackData(request, 'spell', itemData);
-
         request.description = request.description.replace("At Higher Levels.", "<strong>At Higher Levels.</strong>");
     }
 
-    static _buildAttackData(request, type, itemData) {
-        if (request["save-dc"] !== undefined) {
-            const ability = (request["save-ability"] || "").toLowerCase();
-            itemData.actionType = "save";
-            itemData.save = {
-                ability: ability.slice(0, 3),
-                scaling: "flat",
-                dc: request["save-dc"],
-                value: request["save-dc"]
-            };
+    /**
+     * Weapon properties. weaponProperties became itemProperties, keyed by property id with a
+     * localised label, and an item's properties are a set of ids rather than a map of booleans.
+     * validProperties says which ids the item type actually accepts.
+     */
+    static _fillItemProperties(request, type, itemData) {
+        if (!request.properties) return;
+        const valid = CONFIG.DND5E.validProperties?.[type];
+        if (!valid) return;
+        const wanted = request.properties.map(p => p.toLowerCase().trim());
+        const properties = new Set(itemData.properties || []);
+        for (const id of valid) {
+            const label = CONFIG.DND5E.itemProperties?.[id]?.label;
+            if (!label) continue;
+            if (wanted.includes(game.i18n.localize(label).toLowerCase())) properties.add(id);
         }
-        if (request['to-hit'] !== undefined) {
-            if (type === "spell") {
-                itemData.actionType = request['attack-type'] === "Melee" ? "msak" : "rsak";
-            } else {
-                itemData.actionType = request['attack-type'] === "Melee" ? "mwak" : "rwak";
-            }
-            let modifier = parseInt(request['to-hit']);
-            itemData.proficient = request.proficient || type === "spell" || request['attack-source'] === "item";
-            if (itemData.proficient) {
-                modifier -= parseInt(request.character.proficiency);
-            }
-            const abilities = {};
-            for (const ability of request.character.abilities) {
-                const [name, abbr, score, mod] = ability;
-                abilities[abbr.toLowerCase()] = parseInt(mod);
-            }
-            // Calculate the ability modifier to use based on the to-hit value, with a potential magical bonus too
-            const potentialBonuses = Object.values(abilities).map(mod => modifier - mod);
-            itemData.attackBonus = potentialBonuses.includes(0) ? 0 : Math.min(...potentialBonuses);
-            itemData.ability = Object.entries(abilities).find(([abbr, mod]) => modifier === itemData.attackBonus + mod)[0];
-            // Guess proficiency for non standard attacks
-            if (itemData.proficient === false && itemData.attackBonus === parseInt(request.character.proficiency)) {
-                itemData.proficient = true;
-                itemData.attackBonus = 0;
-            }
-        } else if (request.damages) {
-            itemData.actionType = request["damage-types"].every(d => d.includes("Healing") || d === "Temp HP") ? "heal" : "util";
-        }
-        if (request.damages) {
-            const damages = [];
-            for (let i = 0; i < request.damages.length; i++) {
-                let type = (request['damage-types'][i] || "").trim();
-                // Add damage type in the flavor text for each damage
-                const damage = type ? `(${request.damages[i]})[${type}]` : `${request.damages[i]}`;
-                if (CONFIG.DND5E.damageTypes[type.toLowerCase()]) {
-                    type = type.toLowerCase();
-                } else {
-                    type = "";
-                }
-                damages.push([damage, type]);
-            }
-            itemData.damage.parts = damages;
-        }
-        // Weapon properties
-        if (request.properties) {
-            for (const prop in game.dnd5e.config.weaponProperties) {
-                itemData.properties[prop] = !!request.properties.find(p => p.toLowerCase().trim() === game.dnd5e.config.weaponProperties[prop].toLowerCase());
-            }
-        }
+        itemData.properties = [...properties];
     }
-    static getRollOptions(request) {
+
+    /**
+     * D&D Beyond sends a damage formula per damage, already worked out. Passing each through as a
+     * custom formula keeps it exactly as the sheet has it, rather than trying to split it back into
+     * dice and bonus for dnd5e to reassemble.
+     */
+    static _buildDamageParts(request, {healing=false}={}) {
+        const parts = [];
+        for (let i = 0; i < (request.damages || []).length; i++) {
+            const label = (request['damage-types']?.[i] || "").trim();
+            let types = [];
+            if (healing) {
+                types = [label === "Temp HP" ? "temphp" : "healing"];
+            } else if (CONFIG.DND5E.damageTypes[label.toLowerCase()]) {
+                types = [label.toLowerCase()];
+            }
+            parts.push({
+                custom: { enabled: true, formula: String(request.damages[i]) },
+                types
+            });
+        }
+        return parts;
+    }
+
+    static _isHealing(request) {
+        const types = request['damage-types'] || [];
+        return types.length > 0 && types.every(d => d.includes("Healing") || d === "Temp HP");
+    }
+
+    /**
+     * Build the single activity that a generated item rolls. Exactly one is created on purpose: an
+     * item with several activities makes dnd5e open a chooser before it rolls anything.
+     */
+    static _buildActivities(request, type) {
+        const activity = {
+            _id: fvtt_randomID(),
+            name: request.name,
+            sort: 0,
+            // These items stand in for a D&D Beyond roll, so using one shouldn't spend a spell slot
+            consumption: { spellSlot: false, targets: [] }
+        };
+
+        if (request['to-hit'] !== undefined) {
+            activity.type = "attack";
+            activity.attack = {
+                // D&D Beyond has already added the ability modifier and proficiency, so the to-hit
+                // goes in flat. flat makes dnd5e roll the bonus on its own and add nothing to it,
+                // which replaces guessing which ability and how much magic bonus produced the total.
+                flat: true,
+                bonus: String(parseInt(request['to-hit']) || 0),
+                type: {
+                    value: request['attack-type'] === "Melee" ? "melee" : "ranged",
+                    classification: type === "spell" ? "spell" : "weapon"
+                }
+            };
+            activity.damage = { includeBase: false, parts: this._buildDamageParts(request) };
+        } else if (request["save-dc"] !== undefined) {
+            activity.type = "save";
+            const ability = (request["save-ability"] || "").toLowerCase().slice(0, 3);
+            activity.save = {
+                // save.ability is a set of ability ids now, not a single one
+                ability: ability ? [ability] : [],
+                // An empty calculation means the DC is the flat number in the formula
+                dc: { calculation: "", formula: String(request["save-dc"]) }
+            };
+            activity.damage = { onSave: "half", parts: this._buildDamageParts(request) };
+        } else if (this._isHealing(request)) {
+            activity.type = "heal";
+            activity.healing = this._buildDamageParts(request, { healing: true })[0];
+        } else if ((request.damages || []).length > 0) {
+            activity.type = "damage";
+            activity.damage = { parts: this._buildDamageParts(request) };
+        } else {
+            activity.type = "utility";
+        }
+        return { [activity._id]: activity };
+    }
+    /**
+     * Roll configuration for dnd5e's actor roll methods, which take (config, dialog, message)
+     * instead of the d20Roll helper this used to call.
+     *
+     * D&D Beyond has already settled the advantage state and which dice to roll, so that goes in as
+     * flags rather than as a formula. halflingLucky and reliableTalent are read off the process
+     * config, but elvenAccuracy is only ever read from an individual roll's options.
+     */
+    static getRollConfig(request) {
         const d20 = request.d20 || "1d20";
-        const rollMode = request.whisper === 0 ? "roll" : "gmroll";
-        const reliableTalent = d20.includes("min10"); // Also applies to silver tongue
-        const halflingLucky = d20.includes("ro<=1");
-        let advantageSettings = {};
+        const config = {
+            reliableTalent: d20.includes("min10"), // Also applies to silver tongue
+            halflingLucky: d20.includes("ro<=1"),
+            rolls: [{ options: {} }]
+        };
         switch (request.advantage) {
             default:
             case 0: // NORMAL
             case 1: // DOUBLE
             case 5: // THRICE
-                advantageSettings = {fastForward: true };
+            case 2: // QUERY, answered by the roll dialog
                 break;
             case 3: // ADVANTAGE
-                advantageSettings = { fastForward: true, advantage: true };
+                config.advantage = true;
                 break;
             case 6: // SUPER ADVANTAGE
-                advantageSettings = { fastForward: true, elvenAccuracy: true, advantage: true };
+                config.advantage = true;
+                config.rolls[0].options.elvenAccuracy = true;
                 break;
             case 4: // DISADVANTAGE
             case 7: // SUPER DISADVANTAGE
-                advantageSettings = { fastForward: true, disadvantage: true };
-                break;
-            case 2: // QUERY
+                config.disadvantage = true;
                 break;
         }
-        return { rollMode, reliableTalent, halflingLucky, ...advantageSettings }
+        return config;
+    }
+
+    // Only a QUERY needs the roll dialog; every other case was decided on D&D Beyond
+    static getRollDialogConfig(request) {
+        return { configure: request.advantage === 2 };
+    }
+
+    static getRollMessageConfig(request, actor, token) {
+        return {
+            rollMode: this._getRollMode(request),
+            data: { speaker: this._getSpeaker(actor, token) }
+        };
+    }
+
+    /**
+     * The proficiency dnd5e will add to a skill check for itself, taken from its own helper so that
+     * half proficiency and expertise can't drift from what the roll actually builds.
+     */
+    static _skillProficiency(actor, ability, skill) {
+        const helper = (game.dnd5e || globalThis.dnd5e)?.dataModels?.actor?.CommonTemplate;
+        const prof = helper?.calculateSkillToolProficiency?.(actor, ability, { skill });
+        if (prof) return prof.hasProficiency ? prof.flat : 0;
+        const multiplier = actor.system.skills?.[skill]?.value || 0;
+        return Math.floor(multiplier * (actor.system.attributes?.prof || 0));
     }
 
     static _advantageToD20(request) {
@@ -454,7 +536,8 @@ class Beyond20 {
 
         if (!combat) {
             if (game.user.isGM) {
-                const Combat = getDocumentClass("Combat")
+                // getDocumentClass is a bare global that Foundry 14 removed
+                const Combat = CONFIG.Combat.documentClass;
                 combat = await Combat.create({scene: canvas.scene.id, active: true});
             } else {
                 return null;
@@ -475,8 +558,13 @@ class Beyond20 {
         if (createData.length) {
             await combat.createEmbeddedDocuments("Combatant", createData);
         }
-        const combatants = tokens.map(t => combat.getCombatantByToken(t.id));
-        combat.rollInitiative(combatants.filter(c => !!c).map(c => c.id), {formula, messageOptions: this.getRollOptions(request)})
+        // Foundry 12 added getCombatantsByToken and Foundry 14 removed getCombatantByToken
+        const combatants = tokens.map(t => combat.getCombatantsByToken
+            ? combat.getCombatantsByToken(t.id)[0]
+            : combat.getCombatantByToken(t.id));
+        const mode = this._getRollMode(request);
+        const messageOptions = (game.release?.generation ?? 0) >= 14 ? { messageMode: mode } : { rollMode: mode };
+        await combat.rollInitiative(combatants.filter(c => !!c).map(c => c.id), { formula, messageOptions });
 
         //await token.actor.rollInitiative({createCombatants: true, rerollInitiative: true})
         return true;
@@ -510,46 +598,26 @@ class Beyond20 {
         const skill = SKILLS[request.skill];
         if (!skill) return;
 
-        switch (request.proficiency) {
-            case "Not Proficient": 
-            default:
-                break;
-            case "Half Proficiency":
-                actorData.skills[skill].value = 0.5;
-                break;
-            case "Proficiency": 
-                actorData.skills[skill].value = 1;
-                break;
-            case "Expertise": 
-                actorData.skills[skill].value = 2;
-                break;
-        }
-        const calculated = actorData.abilities[request.ability.toLowerCase()].mod + actorData.skills[skill].value * actorData.attributes.prof;
-        const bonus = parseInt(request.modifier) - calculated;
-        actorData.skills[skill].mod = calculated;
-        actorData.bonuses.abilities.skill = bonus;
-        
-        // Compose roll parts and data
-        const parts = ["@mod"];
-        const data = {mod: calculated};
+        const PROFICIENCY = {
+            "Half Proficiency": 0.5,
+            "Proficiency": 1,
+            "Expertise": 2
+        };
+        // Set the proficiency the sheet reports, so the card is labelled the way D&D Beyond has it
+        if (actorData.skills?.[skill]) actorData.skills[skill].value = PROFICIENCY[request.proficiency] || 0;
 
-        // Skill check bonus
-        if ( bonus ) {
-            data["skillBonus"] = bonus;
-            parts.push("@skillBonus");
-        }
-        // Roll and return
-        const rollOptions = this.getRollOptions(request)
-        mergeObject(rollOptions, {
-            parts: parts,
-            data: data,
-            title: game.i18n.format("DND5E.SkillPromptTitle", {skill: CONFIG.DND5E.skills[skill].label}),
-            messageData: {"flags.dnd5e.roll": {type: "skill", skill }}
-        });
-        rollOptions.speaker = ChatMessage.getSpeaker({actor: actor, token: token});
-        this.callOnToken(actor, token, () => {
-            game.dnd5e.dice.d20Roll(rollOptions);
-        });
+        const ability = request.ability.toLowerCase();
+        // dnd5e adds the ability modifier and the proficiency itself, so only the remainder is passed
+        const calculated = (actorData.abilities[ability]?.mod || 0) + this._skillProficiency(actor, ability, skill);
+        const bonus = parseInt(request.modifier) - calculated;
+
+        const config = this.getRollConfig(request);
+        config.skill = skill;
+        config.ability = ability;
+        if (bonus) config.bonus = String(bonus);
+
+        await actor.rollSkill(config, this.getRollDialogConfig(request),
+            this.getRollMessageConfig(request, actor, token));
         return true;
     }
 
@@ -559,70 +627,39 @@ class Beyond20 {
         const token = this.findToken(request);
         
         const abl = request.ability.toLowerCase();
-        const mod = parseInt(request.modifier)
-        const proficient = mod >= actorData.abilities[abl].mod + actorData.attributes.prof;
-        const calculated = actorData.abilities[abl].mod + proficient * actorData.attributes.prof;
+        const mod = parseInt(request.modifier);
+        const abilityMod = actorData.abilities[abl]?.mod || 0;
+        const prof = actorData.attributes?.prof || 0;
+        // D&D Beyond only sends the final number, so proficiency is inferred from how big it is
+        const proficient = mod >= abilityMod + prof;
+        const calculated = abilityMod + (proficient ? prof : 0);
         const bonus = mod - calculated;
 
-        actorData.abilities[abl].proficient = proficient;
-        actorData.abilities[abl].save = calculated;
-        actorData.bonuses.abilities.save = bonus;
-        
-        // Compose roll parts and data
-        const parts = ["@mod"];
-        const data = {mod: calculated};
+        if (actorData.abilities?.[abl]) actorData.abilities[abl].proficient = proficient ? 1 : 0;
 
-        // Saving throw bonus
-        if ( bonus ) {
-            data["saveBonus"] = bonus;
-            parts.push("@saveBonus");
-        }
-        // Roll and return
-        const rollOptions = this.getRollOptions(request)
-        mergeObject(rollOptions, {
-            parts: parts,
-            data: data,
-            title: game.i18n.format("DND5E.SavePromptTitle", {ability: CONFIG.DND5E.abilities[abl]}),
-            messageData: {"flags.dnd5e.roll": {type: "save", abl }}
-        });
-        rollOptions.speaker = ChatMessage.getSpeaker({actor: actor, token: token});
-        this.callOnToken(actor, token, () => {
-            game.dnd5e.dice.d20Roll(rollOptions);
-        });
+        const config = this.getRollConfig(request);
+        config.ability = abl;
+        if (bonus) config.bonus = String(bonus);
+
+        await actor.rollSavingThrow(config, this.getRollDialogConfig(request),
+            this.getRollMessageConfig(request, actor, token));
         return true;
     }
-    
+
     static async rollAbility(request) {
         const actor = await this.getUpdatedActor(request);
         const token = this.findToken(request);
-        
+
         const abl = request.ability.toLowerCase();
-        const mod = parseInt(request.modifier)
-        const bonus = mod - actor.system.abilities[abl].mod;
+        // An ability check is the bare modifier, so anything else D&D Beyond added is the remainder
+        const bonus = parseInt(request.modifier) - (actor.system.abilities[abl]?.mod || 0);
 
-        actor.system.bonuses.abilities.check = bonus;
-        
-        // Compose roll parts and data
-        const parts = ["@mod"];
-        const data = {mod: actor.system.abilities[abl].mod};
+        const config = this.getRollConfig(request);
+        config.ability = abl;
+        if (bonus) config.bonus = String(bonus);
 
-        // Ability check bonus
-        if ( bonus ) {
-            data["checkBonus"] = bonus;
-            parts.push("@checkBonus");
-        }
-        // Roll and return
-        const rollOptions = this.getRollOptions(request)
-        mergeObject(rollOptions, {
-            parts: parts,
-            data: data,
-            title: game.i18n.format("DND5E.AbilityPromptTitle", {ability: CONFIG.DND5E.abilities[abl]}),
-            messageData: {"flags.dnd5e.roll": {type: "ability", abl }}
-        });
-        rollOptions.speaker = ChatMessage.getSpeaker({actor: actor, token: token});
-        this.callOnToken(actor, token, () => {
-            game.dnd5e.dice.d20Roll(rollOptions);
-        });
+        await actor.rollAbilityCheck(config, this.getRollDialogConfig(request),
+            this.getRollMessageConfig(request, actor, token));
         return true;
     }
 
@@ -631,26 +668,37 @@ class Beyond20 {
         const actor = await this.getUpdatedActor(request, [item]);
         const token = this.findToken(request);
         const actorItem = actor.items.find(i => i.type === item.type && i.name === item.name);
+        if (!actorItem) return false;
 
-        const rollMode = request.whisper === 0 ? "roll" : "gmroll";
-        
-        const roll = ['attack', 'spell-attack'].includes(request.type);
-        this.callOnToken(actor, token, () => {
-            actorItem[roll ? 'use' : 'displayCard']({configureDialog: false, rollMode, createMessage: true});
-        });
+        const message = {
+            rollMode: this._getRollMode(request),
+            data: { speaker: this._getSpeaker(actor, token) }
+        };
+        // use() takes (config, dialog, message) now, and displayCard takes the message config alone
+        if (['attack', 'spell-attack'].includes(request.type)) {
+            // Go straight to the item's own activity, so dnd5e never asks which one to use
+            const activity = actorItem.system.activities?.contents?.[0];
+            if (activity) await activity.use({}, { configure: false }, message);
+            else await actorItem.use({}, { configure: false }, message);
+        } else {
+            await actorItem.displayCard(message);
+        }
         return true;
     }
 
     /**
-     * Native rolls depend on dnd5e's d20Roll helper and the system's template.json data,
-     * which current dnd5e releases no longer provide and Foundry 14 removed.
+     * Native rolls are built on dnd5e's actor roll methods and its activities, which replaced the
+     * d20Roll helper and the old actionType/damage.parts item data. Anything older than dnd5e 4
+     * doesn't have them, and neither does a non-dnd5e system.
      */
     static nativeRollsSupported() {
         if (this._nativeRollsSupported === undefined) {
-            const dnd5e = game.dnd5e || globalThis.dnd5e;
+            const actorProto = CONFIG.Actor?.documentClass?.prototype;
             this._nativeRollsSupported = game.system?.id === "dnd5e" &&
-                typeof dnd5e?.dice?.d20Roll === "function" &&
-                !!game.system.template?.Actor;
+                typeof actorProto?.rollSkill === "function" &&
+                typeof actorProto?.rollSavingThrow === "function" &&
+                typeof actorProto?.rollAbilityCheck === "function" &&
+                !!CONFIG.DND5E?.activityTypes;
         }
         return this._nativeRollsSupported;
     }
@@ -904,7 +952,7 @@ Hooks.on('init', function () {
     const nativeRollsSupported = Beyond20.nativeRollsSupported();
     game.settings.register("beyond20", "nativeRolls", {
         name: "Use Foundry native rolls (EXPERIMENTAL)",
-        hint: "If enabled, will use Foundry native rolls instead of the Beyond20 roll renderer. Cannot work when D&D Beyond Digital Dice are enabled. All Beyond20 features may not be supported.",
+        hint: "If enabled, will use Foundry native rolls instead of the Beyond20 roll renderer. Cannot work when D&D Beyond Digital Dice are enabled. All Beyond20 features may not be supported. Rebuilt for dnd5e 4 and later: please report anything that rolls the wrong number.",
         scope: "client",
         config: nativeRollsSupported,
         default: false,
