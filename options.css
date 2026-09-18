@@ -338,3 +338,13 @@
     padding: 5px;
     border-radius: 5px;
 }
+/* Marks the quick settings and options pages when running the Foundry VTT 14 test fork */
+.beyond20-test-build-banner {
+    background-color: rgb(140, 74, 0);
+    color: #fff;
+    padding: 6px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+    border-radius: 3px;
+    margin-bottom: 6px;
+}

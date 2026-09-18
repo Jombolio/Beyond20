@@ -25,6 +25,15 @@ function createOptionList() {
         }
     }
     $("main").prepend(E.ul({ class: "list-group beyond20-options" }, ...options));
+    // Say so up front when this is the test fork rather than the store release
+    if (isTestBuild()) {
+        $("main").prepend(
+            E.div({ class: "beyond20-test-build-banner" },
+                E.strong({}, "Test build"),
+                E.span({}, ` — ${getBuildVersion()}. Foundry VTT 14 fixes. Not the store release.`)
+            )
+        );
+    }
     $(".beyond20-options").append(
         E.li({ class: "list-group-item beyond20-option" },
             E.div({ class: "list-content", style: "padding-right: 0px;"},

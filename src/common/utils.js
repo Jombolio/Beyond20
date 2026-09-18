@@ -151,6 +151,41 @@ function isSupportedVTT(tab) {
     return SUPPORTED_VTT_URLS.some(url => urlMatches(tab.url, url))
 }
 
+/* This repository is the Foundry VTT 14 test fork. It installs alongside the store release of
+ * Beyond20, so the UI it injects into D&D Beyond says which of the two is running.
+ *
+ * The marker lives in the manifest name, which every build carries: the repository sets it, and so
+ * does the Chrome dev workflow. The store release doesn't have it, so it stays unmarked.
+ *
+ * utils.js is also bundled into the page scripts, where there is no extension API at all, so the
+ * manifest is only ever read from inside these functions.
+ */
+const TEST_BUILD_MARKER = "(V14)";
+
+function getExtensionManifest() {
+    try {
+        return chrome?.runtime?.getManifest?.() ?? null;
+    } catch (err) {
+        return null;
+    }
+}
+
+function isTestBuild() {
+    const manifest = getExtensionManifest();
+    return !!manifest?.name?.includes(TEST_BUILD_MARKER);
+}
+
+// "Beyond 20 (V14)" on a test build, "Beyond 20" otherwise
+function getBuildName() {
+    return getExtensionManifest()?.name || "Beyond 20";
+}
+
+// The dev workflow puts the commit in version_name, so prefer it over the bare version
+function getBuildVersion() {
+    const manifest = getExtensionManifest();
+    return manifest?.version_name || manifest?.version || "";
+}
+
 function alertSettings(url, title) {
     if (alertify.Beyond20Settings === undefined)
         alertify.dialog('Beyond20Settings', function () { return {}; }, false, "alert");
@@ -164,10 +199,10 @@ function alertSettings(url, title) {
 
 }
 function alertQuickSettings() {
-    alertSettings("popup.html", "Beyond 20 Quick Settings");
+    alertSettings("popup.html", `${getBuildName()} Quick Settings`);
 }
 function alertFullSettings() {
-    alertSettings("options.html", "Beyond 20 Settings");
+    alertSettings("options.html", `${getBuildName()} Settings`);
 }
 
 function isListEqual(list1, list2) {
@@ -226,7 +261,7 @@ E = new Proxy({}, {
 
 
 function initializeAlertify() {
-    alertify.set("alert", "title", "Beyond 20");
+    alertify.set("alert", "title", getBuildName());
     alertify.set("notifier", "position", "top-center");
 
     alertify.defaults.transition = "zoom";

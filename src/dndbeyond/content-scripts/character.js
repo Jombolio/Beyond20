@@ -2791,7 +2791,8 @@ function injectSettingsButton() {
 
     let button_type = null;
     let gap = null;
-    let span_text = "Beyond 20";
+    // On a test build this reads "Beyond 20 (V14)", so the sheet says which of the two is running
+    let span_text = getBuildName();
     let icon = chrome.runtime.getURL("images/icons/badges/normal20.png");
     if (desktop_gap.length > 0) {
         button_type = "desktop";
@@ -2808,8 +2809,13 @@ function injectSettingsButton() {
         return;
     }
 
-    const button = E.div({ class: "ct-character-header-" + button_type + "__group ct-character-header-" + button_type + "__group--beyond20" },
-        E.div({ class: "ct-character-header-" + button_type + "__button ct-beyond20-settings-button" },
+    // The mobile header has no room for a label, so the button gets a "TEST" flag of its own there
+    const test_build = isTestBuild();
+    const test_class = test_build ? " beyond20-test-build" : "";
+    const test_title = test_build ? `Beyond20 test build ${getBuildVersion()} — not the store release` : "";
+
+    const button = E.div({ class: "ct-character-header-" + button_type + "__group ct-character-header-" + button_type + "__group--beyond20" + test_class },
+        E.div({ class: "ct-character-header-" + button_type + "__button ct-beyond20-settings-button", title: test_title },
             E.img({ class: "ct-beyond20-settings", src: icon }),
             E.span({ class: "ct-character-header-" + button_type + "__button-label" }, span_text)
         )
